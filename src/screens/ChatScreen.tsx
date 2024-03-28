@@ -1,7 +1,6 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import {NativeStackScreenProps} from '@react-navigation/native-stack';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import axios from 'axios';
-import React, {useEffect, useState} from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Alert,
   FlatList,
@@ -10,8 +9,13 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
-import {CHATS_BASE_URL} from '../utils/Constants';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { BASE_URL, CHATS_BASE_URL } from '../utils/Constants';
+import { useNavigation } from '@react-navigation/native';
+import LocalStorage from '../utils/LocalStorage';
+import { useSelector } from 'react-redux';
+import { State } from '../redux/Reducer';
+import GlobleStyle from '../utils/GlobleStyle';
 
 const category = ['all', 'favourites', 'groups'];
 
@@ -24,62 +28,108 @@ export type Message = {
   updated_at: string;
 };
 
-type ChatContact = {
+export type ChatContact = {
   id: string;
   name: string;
   image_url: string;
   is_group_chat: Boolean;
   last_message_id: string;
-  lastMessage: Message;
+  last_message: Message;
   participant_ids: string[];
   created_at: string;
   updated_at: string;
 };
 
+type ChatProp = {chat: ChatContact};
+const ChatContainer = ({chat}: ChatProp): JSX.Element => {
+  const [imageError, setImageError] = useState(false);
+  const navigation: any = useNavigation();
+
+  return (
+    <TouchableOpacity
+      onPress={() => navigation.navigate('conversation_screen', chat)}
+      style={{
+        flexDirection: 'row',
+        marginVertical: 5,
+        marginHorizontal: 15,
+        borderRadius: 15,
+        backgroundColor: '#ffffff',
+        overflow: 'hidden',
+      }}>
+      <Image
+        style={{width: 65, height: 65}}
+        onError={e => {
+          setImageError(true);
+        }}
+        alt="../images/ic_person.png"
+        source={
+          chat.image_url && !imageError
+            ? {uri: chat.image_url}
+            : require('../images/ic_person.png')
+        }
+      />
+      <View style={{flex: 1, backgroundColor: '#ded1ff', paddingHorizontal: 10, paddingVertical: 5}}>
+        <Text style={[GlobleStyle.titleSmall, {}]}>{chat.name}</Text>
+        <Text style={[GlobleStyle.labelMedium, {color: '#000'}]}>{chat.last_message?.content ?? ''}</Text>
+      </View>
+    </TouchableOpacity>
+  );
+};
+
 const ChatScreen = ({navigation}: NativeStackScreenProps<any>): JSX.Element => {
   const [contact, setContact] = useState<ChatContact[]>([]);
+  const [filteredContent, setFilteredContent] = useState<ChatContact[]>([])
   const [selectedCategory, setSelectedCategory] = useState(0);
 
+  const localStorage = new LocalStorage();
+  const token = useSelector((state: State) => state.token);
+
   const getContacts = async () => {
-    const token = await AsyncStorage.getItem('accessToken');
-    console.log(token);
-    if (token != null && token.length > 0) {
-      let config = {
-        headers: {
-          Authorization: 'Bearer ' + token,
-        },
-      };
-      axios
-        .get(CHATS_BASE_URL + 'chats', config)
-        .then(res => {
-          console.log('chat response ----> \n\n\n\n' + res.data);
-          setContact(res.data);
-        })
-        .catch(err => {
-          console.log(err);
-          Alert.alert('Api error', 'unable to fetch contacts\n' + err.message);
-        });
-    }
+    let config = {
+      headers: {
+        Authorization: 'Bearer ' + token,
+      },
+    };      
+    
+    axios
+      .get(CHATS_BASE_URL + 'chats', config)
+      .then(res => {
+        setContact(res.data);
+      })
+      .catch(err => {
+        getRefreshToken();
+      });
+  };
+
+  const getRefreshToken = async () => {
+    let refreshToken = await localStorage.getValue('refreshToken');
+    axios
+      .get(BASE_URL + 'refresh_access_token?refresh_token=' + refreshToken)
+      .then(res => {
+        localStorage.setValue('refreshToken', res.data?.refresh_token);
+        localStorage.setValue('accessToken', res.data?.access_token);
+        getContacts();
+      })
+      .catch(err => {
+        Alert.alert('Api error', 'unable to fetch contacts\n' + err.message);
+      });
   };
 
   useEffect(() => {
-    getUser();
-    getContacts();
-  }, []);
-
-  const getUser = () => {
-    try {
-      AsyncStorage.getItem('accessToken').then(value => {
-        if (value == null) {
-          navigation.pop();
-          navigation.navigate('intro_screen');
-        }
-      });
-    } catch (e) {
-      navigation.pop();
-      navigation.navigate('intro_screen');
+    if(contact.length) {
+      if(selectedCategory === 2) {
+        setFilteredContent(contact.filter( item => item.is_group_chat))
+      } else {
+        setFilteredContent(contact)
+      }
     }
-  };
+  }, [contact, selectedCategory])
+
+  useEffect(() => {
+    if(token) {
+      getContacts();
+    }
+  }, [token]);
 
   return (
     <SafeAreaView style={{flex: 1}}>
@@ -89,14 +139,30 @@ const ChatScreen = ({navigation}: NativeStackScreenProps<any>): JSX.Element => {
           paddingTop: 20,
           paddingBottom: 100,
         }}>
-        <Image
-          style={{width: 35, height: 35, alignSelf: 'flex-end'}}
-          source={require('../images/ic_search.png')}
-        />
+        <TouchableOpacity
+          onPress={() => navigation.navigate('search_screen')}>
+          <Image
+            style={{
+              width: 30,
+              height: 30,
+              alignSelf: 'flex-end',
+              tintColor: '#FFFFFF',
+              marginEnd: 25,
+              marginBottom: 10,
+            }}
+            source={require('../images/ic_search.png')}
+          />
+        </TouchableOpacity>
+
         <FlatList
           data={category}
           horizontal
-          renderItem={({item, index}) => {
+          bounces={false}
+          keyExtractor={item => {
+            return item;
+          }}
+          contentContainerStyle={{flexGrow: 1, alignItems: 'center'}}
+          renderItem={({item, index}) => { 
             return (
               <TouchableOpacity onPress={() => setSelectedCategory(index)}>
                 <View
@@ -107,14 +173,13 @@ const ChatScreen = ({navigation}: NativeStackScreenProps<any>): JSX.Element => {
                       paddingHorizontal: 15,
                       paddingVertical: 5,
                       borderRadius: 10,
+                      alignSelf: 'center',
                     },
-                    selectedCategory == index
-                      ? {
-                          backgroundColor: '#cec6fa',
-                          paddingHorizontal: 18,
-                          paddingVertical: 8,
-                        }
-                      : {},
+                    selectedCategory == index && {
+                      backgroundColor: '#cec6fa',
+                      paddingHorizontal: 18,
+                      paddingVertical: 8,
+                    },
                   ]}>
                   <Text style={{fontWeight: 'bold'}}>{item}</Text>
                 </View>
@@ -123,6 +188,7 @@ const ChatScreen = ({navigation}: NativeStackScreenProps<any>): JSX.Element => {
           }}
         />
       </View>
+
       <View
         style={{
           flex: 1,
@@ -130,30 +196,13 @@ const ChatScreen = ({navigation}: NativeStackScreenProps<any>): JSX.Element => {
           borderTopEndRadius: 50,
           marginTop: -50,
           backgroundColor: '#FFFFFF',
+          overflow: 'hidden',
         }}>
         <FlatList
-          data={contact}
-          renderItem={({item, index}) => {
-            return (
-              <View
-                style={{
-                  flexDirection: 'row',
-                  marginVertical: 5,
-                  marginHorizontal: 15,
-                  borderRadius: 15,
-                  backgroundColor: '#ffffff',
-                  overflow: 'hidden'
-                }}>
-                <Image
-                  style={{width: 65, height: 65}}
-                  source={{uri: item.image_url}}
-                />
-                <View style={{flex: 1, backgroundColor: '#ded1ff'}}>
-                  <Text>{item.name}</Text>
-                  <Text>{item.lastMessage?.content ?? ''}</Text>
-                </View>
-              </View>
-            );
+          data={filteredContent}
+          contentContainerStyle={{paddingVertical: 20}}
+          renderItem={props => {
+            return <ChatContainer chat={props.item} />;
           }}
         />
       </View>

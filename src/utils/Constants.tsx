@@ -1,4 +1,4 @@
-const BASE_URL = "http://192.168.5.121:8000";//"http://192.168.5.57:8007/";
+const BASE_URL = "http://192.168.5.57:8007/";//"http://192.168.5.121:8000";
 const CHATS_BASE_URL = "http://192.168.5.57:8009/";
 const CHAT_SOCKET_URL = "ws://192.168.5.57:8009/ws/";
 

@@ -1,9 +1,11 @@
 import React, { useState } from "react";
-import { ActivityIndicator, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Image, Platform, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import AuthTextField from "../components/AuthTextField";
 import GlobleStyle from "../utils/GlobleStyle";
 import axios from "axios";
 import { BASE_URL } from "../utils/Constants";
+import ImagePicker from "react-native-image-crop-picker";
+import { PERMISSIONS, RESULTS, check, request } from "react-native-permissions";
 
 
 const SignUpScreen = ({ navigation }: any): JSX.Element => {
@@ -12,15 +14,31 @@ const SignUpScreen = ({ navigation }: any): JSX.Element => {
     const [mobile, setMobile] = useState('')
     const [password, setPassword] = useState('')
     const [isLoading, setLoading] = useState(false)
+    const [profile, setProfile] = useState<string | null>(null)
 
     const signUp = () => {
-        const data = {email: mail, password: password}
+        const data = {email: mail, password: password, name: name, }
         axios.post(BASE_URL + 'auth/token', data)
         .then( response => {
 
         }).catch(err => {
-            console.log("signUp ====>", err.message)
+            console.log("signUp error ====>", err.message)
         });
+    }
+
+    const getProfileImage = async () => {
+        console.log(Platform.OS);
+        if(Platform.OS == "android") {
+            const result = await request(PERMISSIONS.ANDROID.READ_EXTERNAL_STORAGE)
+            console.log(result);
+            if(result == RESULTS.GRANTED) {
+                const mProfile = await ImagePicker.openPicker({mediaType: 'photo'})
+                console.log(mProfile);
+                if(mProfile.path) {
+                    setProfile(mProfile.path)
+                }
+            }
+        }
     }
 
     return(
@@ -32,7 +50,15 @@ const SignUpScreen = ({ navigation }: any): JSX.Element => {
             <View style={[style.circle, {bottom: -110,left: 0,}]} />
 
             <View style={style.container}>
-                <Text style={[GlobleStyle.titleMedium]}>SIGN UP</Text>
+                <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}}>
+                    <Text style={[GlobleStyle.titleMedium]}>SIGN UP</Text>
+                    <TouchableOpacity
+                        onPress={getProfileImage}>
+                        <Image 
+                            style= {{width: 50, height: 50, resizeMode: 'stretch', borderRadius : profile ? 50 : 0}}
+                            source={(profile) ? {uri: profile} : require('../images/ic_select_profile.png')} />
+                    </TouchableOpacity>
+                </View>
 
                 <AuthTextField
                     iconSource={require('../images/ic_person.png')}

@@ -12,20 +12,21 @@ interface CustomTextInputProps {
 const AuthTextField = (
     {iconSource, value, onChangeText, placeholder}: CustomTextInputProps
 ): JSX.Element => {
-    return(
-        <View style={style.shadowView}>
-            <Image
-                style={style.icon}
-                source={iconSource} />
+  console.log('aaaaaaa');
 
-            <TextInput
-                style={[GlobleStyle.labelMedium, {flex: 1}]}
-                value={value}
-                onChangeText={onChangeText}
-                placeholder={placeholder}
-                placeholderTextColor='#999' />
-        </View>
-    );
+  return (
+    <View style={style.shadowView}>
+      <Image style={style.icon} source={iconSource} />
+
+      <TextInput
+        style={[GlobleStyle.labelMedium, {flex: 1}]}
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor="#999"
+      />
+    </View>
+  );
 }
 
 const style = StyleSheet.create({
@@ -46,5 +47,8 @@ const style = StyleSheet.create({
         height: 25,
     }
 });
+const doRender = (prev : CustomTextInputProps , updated : CustomTextInputProps) :  boolean => {
+    return prev.value === updated.value
+}
 
-export default AuthTextField;
+export default React.memo(AuthTextField, doRender);
